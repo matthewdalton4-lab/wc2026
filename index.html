@@ -466,6 +466,112 @@
     margin-bottom: 8px;
   }
   .recap-events { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  /* ── CATCHUP REDESIGN ──────────────────────────────────────── */
+  .catchup-date-section { margin-bottom: 32px; }
+  .catchup-date-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .recap-card-full {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r2);
+    padding: 16px 18px;
+    margin-bottom: 10px;
+    transition: border-color .2s;
+  }
+  .recap-card-full.fav-game {
+    border-color: var(--fav);
+    background: linear-gradient(135deg, #111318 0%, #1a1810 100%);
+  }
+
+  .recap-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .recap-left { flex: 1; }
+  .recap-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .recap-match-title {
+    font-weight: 600;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .recap-score-inline {
+    font-family: var(--font-head);
+    font-size: 20px;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  .recap-events-line {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .summary-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    font-family: var(--font-body);
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: var(--r);
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+  .summary-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .summary-btn:disabled { opacity: .6; cursor: default; }
+
+  .summary-box {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .summary-bullets {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .summary-bullets li {
+    font-size: 13px;
+    color: var(--text);
+    padding-left: 16px;
+    position: relative;
+    line-height: 1.5;
+  }
+  .summary-bullets li::before {
+    content: "▸";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-size: 11px;
+    top: 2px;
+  }
+
   .yt-link {
     display: inline-flex;
     align-items: center;
@@ -1224,118 +1330,262 @@ function buildScenario(group, team) {
 // ═══════════════════════════════════════════════════════════════════
 //  MORNING CATCH-UP TAB
 // ═══════════════════════════════════════════════════════════════════
+
+// localStorage key for persisted catch-up history
+const CATCHUP_STORE_KEY = "wc_catchup_history";
+// Cache for AI summaries: { fixtureId: ["bullet1","bullet2",...] }
+const SUMMARY_CACHE_KEY = "wc_ai_summaries";
+
+function loadCatchupHistory() {
+  try { return JSON.parse(localStorage.getItem(CATCHUP_STORE_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function saveCatchupHistory(fixtures) {
+  // Merge new finished fixtures into stored history, dedupe by fixture id
+  const existing = loadCatchupHistory();
+  const existingIds = new Set(existing.map(f => f.fixture.id));
+  const merged = [
+    ...fixtures.filter(f => !existingIds.has(f.fixture.id)),
+    ...existing,
+  ];
+  // Keep max 200 games to avoid bloating localStorage
+  localStorage.setItem(CATCHUP_STORE_KEY, JSON.stringify(merged.slice(0, 200)));
+  return merged;
+}
+
+function loadSummaryCache() {
+  try { return JSON.parse(localStorage.getItem(SUMMARY_CACHE_KEY) || "{}"); }
+  catch { return {}; }
+}
+
+function saveSummaryCache(cache) {
+  localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(cache));
+}
+
 async function loadCatchupTab() {
   document.getElementById("catchup-content").innerHTML =
     `<div class="state-msg"><div class="spinner"></div><p>Loading catch-up…</p></div>`;
   try {
-    // Get yesterday + today fixtures to cover "last 24 hours"
     const now = new Date();
     const yesterday = new Date(now.getTime() - 86400000).toISOString().slice(0, 10);
     const [ydayData, todayData] = await Promise.all([
       apiFetch("fixtures", { date: yesterday }),
       apiFetch("fixtures", { date: todayLocalStr() }),
     ]);
-
     const allFixtures = [
       ...(ydayData.response || []),
       ...(todayData.response || []),
     ];
-
-    // Only finished games
     const finished = allFixtures.filter(f =>
       ["FT","AET","PEN"].includes(f.fixture.status.short)
     );
-
-    cachedRecap = finished;
-    renderCatchup(finished);
+    // Persist and merge with history
+    const allHistory = saveCatchupHistory(finished);
+    cachedRecap = allHistory;
+    renderCatchup(allHistory);
   } catch (e) {
-    document.getElementById("catchup-content").innerHTML =
-      `<div class="state-msg"><div class="icon">⚠️</div><h3>Couldn't load catch-up</h3><p>${e.message}</p></div>`;
+    // Even on error, show whatever is in history
+    const history = loadCatchupHistory();
+    if (history.length) {
+      cachedRecap = history;
+      renderCatchup(history);
+    } else {
+      document.getElementById("catchup-content").innerHTML =
+        `<div class="state-msg"><div class="icon">⚠️</div><h3>Couldn't load catch-up</h3><p>${e.message}</p></div>`;
+    }
   }
 }
 
-function renderCatchup(fixtures) {
+function fixtureKey(f) {
+  return `${f.fixture.id || (f.teams.home.name + "_" + f.teams.away.name + "_" + f.fixture.date)}`;
+}
+
+async function generateSummary(f) {
+  const cache = loadSummaryCache();
+  const key = fixtureKey(f);
+  if (cache[key]) return cache[key]; // already generated
+
+  const home = f.teams.home.name;
+  const away = f.teams.away.name;
+  const score = `${f.goals.home}-${f.goals.away}`;
+  const goals = (f.events || []).filter(e => e.type === "Goal").map(e =>
+    `${e.time.elapsed}' ${e.player.name} (${e.team.id === f.teams.home.id ? home : away})`
+  );
+  const cards = (f.events || []).filter(e => e.type === "Card").map(e =>
+    `${e.detail} ${e.time.elapsed}' ${e.player.name}`
+  );
+
+  const prompt = `You are a football match reporter. Write exactly 5 short punchy bullet points summarising this World Cup match. Each bullet max 15 words. No intro text, just the 5 bullets as a JSON array of strings.
+
+Match: ${home} ${score} ${away}
+Goals: ${goals.length ? goals.join(", ") : "none"}
+Cards: ${cards.length ? cards.join(", ") : "none"}
+Status: ${f.fixture.status.long}
+
+Respond ONLY with a JSON array, e.g. ["bullet 1","bullet 2","bullet 3","bullet 4","bullet 5"]`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || "[]";
+    const clean = text.replace(/```json|```/g, "").trim();
+    const bullets = JSON.parse(clean);
+    cache[key] = bullets;
+    saveSummaryCache(cache);
+    return bullets;
+  } catch {
+    return null;
+  }
+}
+
+async function renderCatchup(fixtures) {
   if (!fixtures) return;
   const el = document.getElementById("catchup-content");
 
-  const now = new Date();
-  const cutoff = new Date(now.getTime() - 86400000);
-  const recent = fixtures.filter(f => new Date(f.fixture.date) >= cutoff);
-
-  const favGame = recent.find(f =>
-    f.teams.home.name === favTeam || f.teams.away.name === favTeam
-  );
-  const otherGames = recent.filter(f =>
-    f.teams.home.name !== favTeam && f.teams.away.name !== favTeam
+  // Sort newest first
+  const sorted = [...fixtures].sort((a, b) =>
+    new Date(b.fixture.date) - new Date(a.fixture.date)
   );
 
-  let html = `
-    <div class="catchup-header">
-      <div class="catchup-title">Morning Catch-Up</div>
-      <div class="catchup-subtitle">Last 24 hours · ${recent.length} game${recent.length !== 1 ? "s" : ""}</div>
-    </div>`;
+  // Group by date label
+  const groups = {};
+  sorted.forEach(f => {
+    const d = localDateStr(f.fixture.date);
+    if (!groups[d]) groups[d] = [];
+    groups[d].push(f);
+  });
 
-  if (!recent.length) {
-    html += `<div class="no-games">No completed games in the last 24 hours. Check back later!</div>`;
+  let html = `<div class="catchup-header">
+    <div class="catchup-title">Morning Catch-Up</div>
+    <div class="catchup-subtitle">${sorted.length} game${sorted.length !== 1 ? "s" : ""} · most recent first</div>
+  </div>`;
+
+  if (!sorted.length) {
+    html += `<div class="no-games">No completed games yet. Check back once the tournament starts!</div>`;
     el.innerHTML = html;
     return;
   }
 
-  // Spotlight: fav team
-  if (favGame) {
-    const h = favGame.teams.home;
-    const a = favGame.teams.away;
-    const hFlag = getTeamCode(h.name);
-    const aFlag = getTeamCode(a.name);
-    const isFavHome = h.name === favTeam;
-    const favScore  = isFavHome ? favGame.goals.home : favGame.goals.away;
-    const oppScore  = isFavHome ? favGame.goals.away : favGame.goals.home;
-    const result    = favScore > oppScore ? "WIN 🎉" : favScore < oppScore ? "LOSS 😔" : "DRAW 🤝";
+  Object.entries(groups).forEach(([dateStr, games]) => {
+    const isFavDate = games.some(f =>
+      f.teams.home.name === favTeam || f.teams.away.name === favTeam
+    );
+    html += `<div class="catchup-date-section">`;
+    html += `<div class="catchup-date-label">${formatDateLabel(dateStr)}</div>`;
 
-    html += `
-      <div class="spotlight-card">
-        <div class="spotlight-label">⭐ Your team — ${favTeam}</div>
-        <div class="spotlight-match"><span class="team-flag">${hFlag}</span> ${h.name} ${favGame.goals.home} – ${favGame.goals.away} <span class="team-flag">${aFlag}</span> ${a.name}</div>
-        <div class="spotlight-result">${result} · ${toLocalTime(favGame.fixture.date)}</div>
-        ${buildCatchupEvents(favGame)}
-        <a class="yt-link" href="${ytSearchUrl(h.name, a.name)}" target="_blank" rel="noopener">
-          ▶ YouTube Highlights
-        </a>
-      </div>`;
-  }
+    // Fav team game first within each date
+    const favGame = games.find(f =>
+      f.teams.home.name === favTeam || f.teams.away.name === favTeam
+    );
+    const otherGames = games.filter(f =>
+      f.teams.home.name !== favTeam && f.teams.away.name !== favTeam
+    );
+    const orderedGames = favGame ? [favGame, ...otherGames] : otherGames;
 
-  // Other games grid
-  if (otherGames.length) {
-    html += `<div class="recap-grid">`;
-    otherGames.forEach(f => {
+    orderedGames.forEach(f => {
+      const isFav = f.teams.home.name === favTeam || f.teams.away.name === favTeam;
       const h = f.teams.home;
       const a = f.teams.away;
       const hFlag = getTeamCode(h.name);
       const aFlag = getTeamCode(a.name);
-      html += `
-        <div class="recap-card">
-          <div class="recap-match-title"><span class="team-flag">${hFlag}</span> ${h.name} vs <span class="team-flag">${aFlag}</span> ${a.name}</div>
-          <div class="recap-score">${f.goals.home} – ${f.goals.away}</div>
-          <div class="recap-events">${buildCatchupEventsText(f)}</div>
-          <a class="yt-link" href="${ytSearchUrl(h.name, a.name)}" target="_blank" rel="noopener">
-            ▶ Highlights
-          </a>
-        </div>`;
+      const isFavHome = h.name === favTeam;
+      const favScore  = isFavHome ? f.goals.home : f.goals.away;
+      const oppScore  = isFavHome ? f.goals.away : f.goals.home;
+      const result    = isFav ? (favScore > oppScore ? "WIN 🎉" : favScore < oppScore ? "LOSS 😔" : "DRAW 🤝") : "";
+      const fKey      = fixtureKey(f);
+
+      html += `<div class="recap-card-full${isFav ? " fav-game" : ""}" id="card-${fKey}">
+        <div class="recap-card-top">
+          <div class="recap-left">
+            ${isFav ? `<div class="spotlight-label" style="margin-bottom:6px">⭐ ${favTeam} ${result}</div>` : ""}
+            <div class="recap-match-title">
+              <span class="team-flag">${hFlag}</span> ${h.name}
+              <span class="recap-score-inline">${f.goals.home} – ${f.goals.away}</span>
+              <span class="team-flag">${aFlag}</span> ${a.name}
+            </div>
+            <div class="recap-events-line">${buildCatchupEventsInline(f)}</div>
+          </div>
+          <div class="recap-right">
+            <a class="yt-link" href="${ytSearchUrl(h.name, a.name)}" target="_blank" rel="noopener">▶ Highlights</a>
+            <button class="summary-btn" onclick="loadSummaryForCard('${fKey}', this)" data-fkey="${fKey}">
+              ✦ AI Summary
+            </button>
+          </div>
+        </div>
+        <div class="summary-box" id="summary-${fKey}" style="display:none"></div>
+      </div>`;
     });
+
     html += `</div>`;
-  }
+  });
 
   el.innerHTML = html;
+
+  // Auto-generate summaries for fav team games (background, no wait)
+  sorted.filter(f =>
+    f.teams.home.name === favTeam || f.teams.away.name === favTeam
+  ).forEach(f => {
+    const key = fixtureKey(f);
+    const cache = loadSummaryCache();
+    if (!cache[key]) {
+      generateSummary(f); // fire and forget — populates cache for next click
+    }
+  });
 }
 
-function buildCatchupEvents(f) {
+async function loadSummaryForCard(fKey, btn) {
+  const box = document.getElementById(`summary-${fKey}`);
+  if (!box) return;
+
+  // Toggle off if already visible
+  if (box.style.display !== "none") {
+    box.style.display = "none";
+    btn.textContent = "✦ AI Summary";
+    return;
+  }
+
+  btn.textContent = "⏳ Generating…";
+  btn.disabled = true;
+
+  // Find fixture from cachedRecap
+  const f = cachedRecap.find(x => fixtureKey(x) === fKey);
+  if (!f) { btn.textContent = "✦ AI Summary"; btn.disabled = false; return; }
+
+  const bullets = await generateSummary(f);
+  btn.textContent = "✦ AI Summary";
+  btn.disabled = false;
+
+  if (!bullets || !bullets.length) {
+    box.innerHTML = `<p style="color:var(--muted);font-size:12px">Couldn't generate summary.</p>`;
+  } else {
+    box.innerHTML = `<ul class="summary-bullets">${bullets.map(b => `<li>${b}</li>`).join("")}</ul>`;
+  }
+  box.style.display = "block";
+}
+
+function buildCatchupEventsInline(f) {
   const goals = (f.events || []).filter(ev => ev.type === "Goal");
-  if (!goals.length) return "";
-  const lines = goals.map(ev => {
-    const isHome = ev.team.id === f.teams.home.id;
-    return `${ev.time.elapsed}' ${ev.player.name} (${isHome ? f.teams.home.name : f.teams.away.name})`;
-  });
-  return `<div class="recap-events">⚽ ${lines.join(" · ")}</div>`;
+  const cards = (f.events || []).filter(ev => ev.type === "Card" && ev.detail === "Red Card");
+  const parts = [];
+  if (goals.length) {
+    parts.push("⚽ " + goals.map(ev => {
+      const isHome = ev.team.id === f.teams.home.id;
+      return `${ev.time.elapsed}' ${ev.player.name} (${isHome ? f.teams.home.name : f.teams.away.name})`;
+    }).join(" · "));
+  }
+  if (cards.length) {
+    parts.push("🟥 " + cards.map(ev => `${ev.time.elapsed}' ${ev.player.name}`).join(", "));
+  }
+  return parts.join("  ·  ") || "No event data available";
 }
 
 function buildCatchupEventsText(f) {
@@ -1379,7 +1629,6 @@ function toggleTestMode() {
     cachedStandings = getMockStandings();
     if (activeTab === "live")    renderLive(cachedFixtures);
     if (activeTab === "groups")  renderGroups(cachedStandings);
-    if (activeTab === "catchup") renderCatchup(cachedRecap);
     // Switch to catchup to show it off
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
