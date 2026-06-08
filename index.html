@@ -554,7 +554,7 @@
 <!-- ── TABS ───────────────────────────────────────────────────────── -->
 <div class="tabs">
   <div class="tabs-inner">
-    <button class="tab-btn active" data-tab="live">⚽ Live / Today</button>
+    <button class="tab-btn active" data-tab="live">⚽ Fixtures</button>
     <button class="tab-btn" data-tab="groups">🏆 Group Tables</button>
     <button class="tab-btn" data-tab="catchup">☀️ Morning Catch-Up</button>
   </div>
@@ -566,7 +566,7 @@
   <!-- LIVE TAB -->
   <div class="tab-panel active" id="panel-live">
     <div class="live-header">
-      <div class="live-title">Live &amp; Today</div>
+      <div class="live-title">Fixtures</div>
       <div class="poll-badge">
         <div class="poll-dot"></div>
         <span id="poll-countdown">Refreshing in 60s</span>
@@ -652,6 +652,39 @@ const TEAMS = [
 
 const TEAM_FLAGS = Object.fromEntries(TEAMS);
 
+// API name aliases — api-football.com uses different names for some teams
+const TEAM_ALIASES = {
+  "Korea Republic":        "KOR",
+  "South Korea":           "KOR",
+  "Republic of Korea":     "KOR",
+  "USA":                   "USA",
+  "United States":         "USA",
+  "Turkey":                "TUR",
+  "Türkiye":               "TUR",
+  "IR Iran":               "IRN",
+  "Iran":                  "IRN",
+  "Ivory Coast":           "CIV",
+  "Côte d'Ivoire":         "CIV",
+  "DR Congo":              "COD",
+  "Congo DR":              "COD",
+  "Trinidad & Tobago":     "TRI",
+  "Trinidad and Tobago":   "TRI",
+  "New Zealand":           "NZL",
+  "Curacao":               "CUW",
+  "Curaçao":               "CUW",
+  "Czech Republic":        "CZE",
+  "Czechia":               "CZE",
+  "Bosnia and Herzegovina":"BIH",
+  "Bosnia":                "BIH",
+  "North Macedonia":       "MKD",
+  "Cape Verde":            "CPV",
+  "Central African Republic":"CAF",
+};
+
+function getTeamCode(name) {
+  return TEAM_FLAGS[name] || TEAM_ALIASES[name] || name.slice(0,3).toUpperCase();
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  STATE & PREFS
 // ═══════════════════════════════════════════════════════════════════
@@ -706,7 +739,7 @@ function buildFavSelect() {
   TEAMS.forEach(([name, flag]) => {
     const opt = document.createElement("option");
     opt.value = name;
-    opt.textContent = `${flag} ${name}`;
+    opt.textContent = `[${flag}] ${name}`;
     if (name === favTeam) opt.selected = true;
     sel.appendChild(opt);
   });
@@ -915,8 +948,8 @@ function renderLive(fixtures) {
 function buildFixtureCard(f) {
   const home     = f.teams.home.name;
   const away     = f.teams.away.name;
-  const homeFlag = TEAM_FLAGS[home] || "🏳️";
-  const awayFlag = TEAM_FLAGS[away] || "🏳️";
+  const homeFlag = getTeamCode(home);
+  const awayFlag = getTeamCode(away);
   const isFav    = home === favTeam || away === favTeam;
   const status   = f.fixture.status;
   const isLive   = ["1H","2H","ET","P","HT","BT"].includes(status.short);
@@ -1153,8 +1186,8 @@ function renderCatchup(fixtures) {
   if (favGame) {
     const h = favGame.teams.home;
     const a = favGame.teams.away;
-    const hFlag = TEAM_FLAGS[h.name] || "🏳️";
-    const aFlag = TEAM_FLAGS[a.name] || "🏳️";
+    const hFlag = getTeamCode(h.name);
+    const aFlag = getTeamCode(a.name);
     const isFavHome = h.name === favTeam;
     const favScore  = isFavHome ? favGame.goals.home : favGame.goals.away;
     const oppScore  = isFavHome ? favGame.goals.away : favGame.goals.home;
@@ -1178,8 +1211,8 @@ function renderCatchup(fixtures) {
     otherGames.forEach(f => {
       const h = f.teams.home;
       const a = f.teams.away;
-      const hFlag = TEAM_FLAGS[h.name] || "🏳️";
-      const aFlag = TEAM_FLAGS[a.name] || "🏳️";
+      const hFlag = getTeamCode(h.name);
+      const aFlag = getTeamCode(a.name);
       html += `
         <div class="recap-card">
           <div class="recap-match-title"><span class="team-flag">${hFlag}</span> ${h.name} vs <span class="team-flag">${aFlag}</span> ${a.name}</div>
