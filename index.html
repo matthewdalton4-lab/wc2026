@@ -226,7 +226,20 @@
 
   .team-side { display: flex; align-items: center; gap: 10px; }
   .team-side.right { flex-direction: row-reverse; text-align: right; }
-  .team-flag { font-size: 24px; line-height: 1; }
+  .team-flag {
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    letter-spacing: 0.5px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 3px 5px;
+    color: var(--muted);
+    white-space: nowrap;
+    min-width: 36px;
+    text-align: center;
+  }
   .team-name { font-weight: 600; font-size: 15px; }
   .team-name.fav-team { color: var(--fav); }
 
@@ -519,7 +532,7 @@
     .fixture-card { grid-template-columns: 1fr auto 1fr; gap: 6px; padding: 12px 14px; }
     .score { font-size: 26px; }
     .team-name { font-size: 13px; }
-    .team-flag { font-size: 20px; }
+    .team-flag { font-size: 9px; min-width: 28px; padding: 2px 4px; }
   }
 </style>
 </head>
@@ -619,22 +632,22 @@ const TIMEZONES = [
   { label: "HST (UTC-10)",     offset: -10  },
 ];
 
-// ── WC2026 TEAMS (name + flag emoji) ──────────────────────────────
-// Full 48-team list — add/remove as squads are confirmed
+// ── WC2026 TEAMS (name + 3-letter code) ───────────────────────────
 const TEAMS = [
-  ["Argentina","🇦🇷"],["Australia","🇦🇺"],["Belgium","🇧🇪"],["Brazil","🇧🇷"],
-  ["Cameroon","🇨🇲"],["Canada","🇨🇦"],["Chile","🇨🇱"],["Colombia","🇨🇴"],
-  ["Costa Rica","🇨🇷"],["Croatia","🇭🇷"],["Denmark","🇩🇰"],["Ecuador","🇪🇨"],
-  ["Egypt","🇪🇬"],["England","🏴󠁧󠁢󠁥󠁮󠁧󠁿"],["France","🇫🇷"],["Germany","🇩🇪"],
-  ["Ghana","🇬🇭"],["Hungary","🇭🇺"],["Iran","🇮🇷"],["Italy","🇮🇹"],
-  ["Japan","🇯🇵"],["South Korea","🇰🇷"],["Mexico","🇲🇽"],["Morocco","🇲🇦"],
-  ["Netherlands","🇳🇱"],["New Zealand","🇳🇿"],["Nigeria","🇳🇬"],["Panama","🇵🇦"],
-  ["Paraguay","🇵🇾"],["Peru","🇵🇪"],["Poland","🇵🇱"],["Portugal","🇵🇹"],
-  ["Qatar","🇶🇦"],["Romania","🇷🇴"],["Saudi Arabia","🇸🇦"],["Scotland","🏴󠁧󠁢󠁳󠁣󠁴󠁿"],
-  ["Senegal","🇸🇳"],["Serbia","🇷🇸"],["Slovakia","🇸🇰"],["South Africa","🇿🇦"],
-  ["Spain","🇪🇸"],["Switzerland","🇨🇭"],["Trinidad and Tobago","🇹🇹"],
-  ["Turkey","🇹🇷"],["Ukraine","🇺🇦"],["United States","🇺🇸"],
-  ["Uruguay","🇺🇾"],["Venezuela","🇻🇪"],["Wales","🏴󠁧󠁢󠁷󠁬󠁳󠁿"],
+  ["Argentina","ARG"],["Australia","AUS"],["Belgium","BEL"],["Brazil","BRA"],
+  ["Cameroon","CMR"],["Canada","CAN"],["Chile","CHI"],["Colombia","COL"],
+  ["Costa Rica","CRC"],["Croatia","CRO"],["Curaçao","CUW"],["Denmark","DEN"],
+  ["Ecuador","ECU"],["Egypt","EGY"],["England","ENG"],["France","FRA"],
+  ["Germany","GER"],["Ghana","GHA"],["Haiti","HAI"],["Honduras","HON"],
+  ["Hungary","HUN"],["Iran","IRN"],["Italy","ITA"],["Japan","JPN"],
+  ["South Korea","KOR"],["Mexico","MEX"],["Morocco","MAR"],["Netherlands","NED"],
+  ["New Zealand","NZL"],["Nigeria","NGA"],["Panama","PAN"],["Paraguay","PAR"],
+  ["Peru","PER"],["Poland","POL"],["Portugal","POR"],["Qatar","QAT"],
+  ["Romania","ROU"],["Saudi Arabia","KSA"],["Scotland","SCO"],["Senegal","SEN"],
+  ["Serbia","SRB"],["Slovakia","SVK"],["South Africa","RSA"],["Spain","ESP"],
+  ["Switzerland","SUI"],["Trinidad and Tobago","TRI"],["Türkiye","TUR"],
+  ["Ukraine","UKR"],["United States","USA"],["Uruguay","URU"],["Venezuela","VEN"],
+  ["Wales","WAL"],
 ].sort((a,b) => a[0].localeCompare(b[0]));
 
 const TEAM_FLAGS = Object.fromEntries(TEAMS);
@@ -1150,7 +1163,7 @@ function renderCatchup(fixtures) {
     html += `
       <div class="spotlight-card">
         <div class="spotlight-label">⭐ Your team — ${favTeam}</div>
-        <div class="spotlight-match">${hFlag} ${h.name} ${favGame.goals.home} – ${favGame.goals.away} ${aFlag} ${a.name}</div>
+        <div class="spotlight-match"><span class="team-flag">${hFlag}</span> ${h.name} ${favGame.goals.home} – ${favGame.goals.away} <span class="team-flag">${aFlag}</span> ${a.name}</div>
         <div class="spotlight-result">${result} · ${toLocalTime(favGame.fixture.date)}</div>
         ${buildCatchupEvents(favGame)}
         <a class="yt-link" href="${ytSearchUrl(h.name, a.name)}" target="_blank" rel="noopener">
@@ -1169,7 +1182,7 @@ function renderCatchup(fixtures) {
       const aFlag = TEAM_FLAGS[a.name] || "🏳️";
       html += `
         <div class="recap-card">
-          <div class="recap-match-title">${hFlag} ${h.name} vs ${aFlag} ${a.name}</div>
+          <div class="recap-match-title"><span class="team-flag">${hFlag}</span> ${h.name} vs <span class="team-flag">${aFlag}</span> ${a.name}</div>
           <div class="recap-score">${f.goals.home} – ${f.goals.away}</div>
           <div class="recap-events">${buildCatchupEventsText(f)}</div>
           <a class="yt-link" href="${ytSearchUrl(h.name, a.name)}" target="_blank" rel="noopener">
