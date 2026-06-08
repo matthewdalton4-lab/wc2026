@@ -92,6 +92,31 @@
   }
   select:focus { border-color: var(--accent); }
 
+  #test-mode-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    padding: 5px 10px;
+    border-radius: var(--r);
+    font-family: var(--font-body);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+  #test-mode-btn:hover { border-color: #f59e0b; color: #f59e0b; }
+  #test-mode-btn.active { background: #f59e0b22; border-color: #f59e0b; color: #f59e0b; }
+  .test-banner {
+    background: #f59e0b22;
+    border-bottom: 1px solid #f59e0b44;
+    text-align: center;
+    padding: 6px;
+    font-size: 12px;
+    color: #f59e0b;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
   label { color: var(--muted); font-size: 12px; white-space: nowrap; }
 
   /* ── TABS ──────────────────────────────────────────────────── */
@@ -547,6 +572,7 @@
       <select id="fav-select"></select>
       <label for="tz-select">🕐 Timezone</label>
       <select id="tz-select"></select>
+      <button id="test-mode-btn" onclick="toggleTestMode()" title="Load fake data to preview the dashboard">🧪 Test Mode</button>
     </div>
   </div>
 </header>
@@ -1324,6 +1350,138 @@ function buildCatchupEventsText(f) {
 function ytSearchUrl(home, away) {
   const q = encodeURIComponent(`${home} vs ${away} WC2026 highlights`);
   return `https://www.youtube.com/results?search_query=${q}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  TEST MODE
+// ═══════════════════════════════════════════════════════════════════
+let testModeActive = false;
+
+function toggleTestMode() {
+  testModeActive = !testModeActive;
+  const btn = document.getElementById("test-mode-btn");
+  btn.classList.toggle("active", testModeActive);
+  btn.textContent = testModeActive ? "🧪 Exit Test Mode" : "🧪 Test Mode";
+
+  // Show/hide banner
+  let banner = document.getElementById("test-banner");
+  if (testModeActive) {
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "test-banner";
+      banner.className = "test-banner";
+      banner.textContent = "⚠️ TEST MODE — showing fake data, not real API results";
+      document.querySelector(".tabs").after(banner);
+    }
+    // Load mock data into all tabs
+    cachedFixtures  = getMockFixtures();
+    cachedRecap     = getMockRecap();
+    cachedStandings = getMockStandings();
+    if (activeTab === "live")    renderLive(cachedFixtures);
+    if (activeTab === "groups")  renderGroups(cachedStandings);
+    if (activeTab === "catchup") renderCatchup(cachedRecap);
+    // Switch to catchup to show it off
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    document.querySelector('[data-tab="catchup"]').classList.add("active");
+    document.getElementById("panel-catchup").classList.add("active");
+    activeTab = "catchup";
+    renderCatchup(cachedRecap);
+  } else {
+    if (banner) banner.remove();
+    cachedFixtures = null; cachedRecap = null; cachedStandings = null;
+    loadLiveTab();
+    if (activeTab === "catchup") loadCatchupTab();
+    if (activeTab === "groups")  loadGroupsTab();
+  }
+}
+
+function makeFakeFixture(homeTeam, awayTeam, homeGoals, awayGoals, status, elapsed, events, dateOffset = 0) {
+  const d = new Date();
+  d.setHours(d.getHours() - dateOffset);
+  return {
+    fixture: {
+      id: Math.random(),
+      date: d.toISOString(),
+      status: { short: status, long: status === "FT" ? "Match Finished" : status === "1H" ? "First Half" : "Not Started", elapsed }
+    },
+    league: { name: "FIFA World Cup", round: "Group Stage - 1" },
+    teams: {
+      home: { id: 1, name: homeTeam },
+      away: { id: 2, name: awayTeam }
+    },
+    goals: { home: homeGoals, away: awayGoals },
+    events: events || []
+  };
+}
+
+function getMockFixtures() {
+  const fav = favTeam || "England";
+  const now = new Date();
+  return [
+    // Live game
+    makeFakeFixture(fav, "France", 1, 0, "1H", 34, [
+      { time: { elapsed: 23 }, type: "Goal", team: { id: 1 }, player: { name: "Harry Kane" }, assist: { name: "Bellingham" }, detail: "Normal Goal" },
+    ], 0),
+    // Another live
+    makeFakeFixture("Brazil", "Germany", 2, 1, "2H", 67, [
+      { time: { elapsed: 12 }, type: "Goal", team: { id: 1 }, player: { name: "Vinicius Jr" }, assist: { name: "Rodrygo" }, detail: "Normal Goal" },
+      { time: { elapsed: 45 }, type: "Goal", team: { id: 2 }, player: { name: "Müller" }, assist: { name: "Kimmich" }, detail: "Normal Goal" },
+      { time: { elapsed: 58 }, type: "Goal", team: { id: 1 }, player: { name: "Neymar" }, assist: { name: "Paquetá" }, detail: "Normal Goal" },
+      { time: { elapsed: 61 }, type: "Card", team: { id: 2 }, player: { name: "Rudiger" }, detail: "Yellow Card" },
+    ], 0),
+    // Upcoming today
+    makeFakeFixture("Spain", "Argentina", null, null, "NS", null, [], -3),
+    makeFakeFixture("Portugal", "Netherlands", null, null, "NS", null, [], -5),
+    // Yesterday finished
+    makeFakeFixture("Japan", "USA", 2, 0, "FT", 90, [
+      { time: { elapsed: 34 }, type: "Goal", team: { id: 1 }, player: { name: "Kubo" }, assist: { name: "Doan" }, detail: "Normal Goal" },
+      { time: { elapsed: 78 }, type: "Goal", team: { id: 1 }, player: { name: "Mitoma" }, assist: { name: "Kubo" }, detail: "Normal Goal" },
+      { time: { elapsed: 55 }, type: "Card", team: { id: 2 }, player: { name: "Pulisic" }, detail: "Yellow Card" },
+    ], 20),
+    makeFakeFixture("Morocco", "Australia", 1, 1, "FT", 90, [
+      { time: { elapsed: 22 }, type: "Goal", team: { id: 1 }, player: { name: "Ziyech" }, assist: { name: "En-Nesyri" }, detail: "Normal Goal" },
+      { time: { elapsed: 80 }, type: "Goal", team: { id: 2 }, player: { name: "Leckie" }, assist: { name: "Hrustic" }, detail: "Normal Goal" },
+    ], 22),
+    makeFakeFixture("Italy", "Mexico", 0, 1, "FT", 90, [
+      { time: { elapsed: 71 }, type: "Goal", team: { id: 2 }, player: { name: "Lozano" }, assist: { name: "Guardado" }, detail: "Normal Goal" },
+      { time: { elapsed: 88 }, type: "Card", team: { id: 1 }, player: { name: "Donnarumma" }, detail: "Red Card" },
+    ], 24),
+  ];
+}
+
+function getMockRecap() {
+  // Return only finished games from mock fixtures
+  return getMockFixtures().filter(f => f.fixture.status.short === "FT");
+}
+
+function getMockStandings() {
+  const fav = favTeam || "England";
+  return [{
+    league: {
+      standings: [
+        // Group with fav team
+        [
+          { group: `Group C — ${fav}'s Group`, team: { id: 10, name: fav }, all: { played: 2, win: 1, draw: 1, lose: 0 }, goalsDiff: 2, points: 4 },
+          { group: `Group C — ${fav}'s Group`, team: { id: 11, name: "France" }, all: { played: 2, win: 1, draw: 0, lose: 1 }, goalsDiff: 1, points: 3 },
+          { group: `Group C — ${fav}'s Group`, team: { id: 12, name: "Denmark" }, all: { played: 2, win: 0, draw: 1, lose: 1 }, goalsDiff: -1, points: 1 },
+          { group: `Group C — ${fav}'s Group`, team: { id: 13, name: "Serbia" }, all: { played: 2, win: 0, draw: 0, lose: 2 }, goalsDiff: -2, points: 0 },
+        ].map(t => ({...t, group: `Group C`})),
+        [
+          { group: "Group A", team: { id: 1, name: "Brazil" }, all: { played: 2, win: 2, draw: 0, lose: 0 }, goalsDiff: 4, points: 6 },
+          { group: "Group A", team: { id: 2, name: "Germany" }, all: { played: 2, win: 1, draw: 0, lose: 1 }, goalsDiff: 0, points: 3 },
+          { group: "Group A", team: { id: 3, name: "Japan" }, all: { played: 2, win: 0, draw: 1, lose: 1 }, goalsDiff: -1, points: 1 },
+          { group: "Group A", team: { id: 4, name: "Canada" }, all: { played: 2, win: 0, draw: 0, lose: 2 }, goalsDiff: -3, points: 0 },
+        ],
+        [
+          { group: "Group B", team: { id: 5, name: "Spain" }, all: { played: 2, win: 1, draw: 1, lose: 0 }, goalsDiff: 3, points: 4 },
+          { group: "Group B", team: { id: 6, name: "Argentina" }, all: { played: 2, win: 1, draw: 1, lose: 0 }, goalsDiff: 2, points: 4 },
+          { group: "Group B", team: { id: 7, name: "Morocco" }, all: { played: 2, win: 0, draw: 1, lose: 1 }, goalsDiff: -2, points: 1 },
+          { group: "Group B", team: { id: 8, name: "Poland" }, all: { played: 2, win: 0, draw: 0, lose: 2 }, goalsDiff: -3, points: 0 },
+        ],
+      ]
+    }
+  }];
 }
 
 // ═══════════════════════════════════════════════════════════════════
