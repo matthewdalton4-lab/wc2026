@@ -679,6 +679,74 @@ const TEAM_ALIASES = {
   "North Macedonia":       "MKD",
   "Cape Verde":            "CPV",
   "Central African Republic":"CAF",
+  "Ivory Coast":           "CIV",
+  "Côte d\'Ivoire":        "CIV",
+  "Sweden":                "SWE",
+  "Tunisia":               "TUN",
+  "Czech Republic":        "CZE",
+  "Czechia":               "CZE",
+  "Albania":               "ALB",
+  "Austria":               "AUT",
+  "Chile":                 "CHI",
+  "Finland":               "FIN",
+  "Greece":                "GRE",
+  "Iceland":               "ISL",
+  "Israel":                "ISR",
+  "Jamaica":               "JAM",
+  "Norway":                "NOR",
+  "Honduras":              "HON",
+  "Guatemala":             "GUA",
+  "El Salvador":           "SLV",
+  "Cuba":                  "CUB",
+  "Suriname":              "SUR",
+  "Guyana":                "GUY",
+  "Bermuda":               "BER",
+  "Mali":                  "MLI",
+  "Algeria":               "ALG",
+  "Zambia":                "ZAM",
+  "Tanzania":              "TAN",
+  "Uganda":                "UGA",
+  "Kenya":                 "KEN",
+  "Angola":                "ANG",
+  "Mozambique":            "MOZ",
+  "Zimbabwe":              "ZIM",
+  "Ethiopia":              "ETH",
+  "Congo":                 "CGO",
+  "Libya":                 "LBA",
+  "Sudan":                 "SDN",
+  "Iraq":                  "IRQ",
+  "Jordan":                "JOR",
+  "Kuwait":                "KUW",
+  "Oman":                  "OMA",
+  "Bahrain":               "BHR",
+  "UAE":                   "UAE",
+  "United Arab Emirates":  "UAE",
+  "Syria":                 "SYR",
+  "Lebanon":               "LIB",
+  "Uzbekistan":            "UZB",
+  "Kazakhstan":            "KAZ",
+  "Kyrgyzstan":            "KGZ",
+  "Tajikistan":            "TJK",
+  "Turkmenistan":          "TKM",
+  "Indonesia":             "IDN",
+  "Vietnam":               "VIE",
+  "Thailand":              "THA",
+  "Philippines":           "PHI",
+  "Myanmar":               "MYA",
+  "Malaysia":              "MAS",
+  "Singapore":             "SGP",
+  "Chinese Taipei":        "TPE",
+  "China":                 "CHN",
+  "Mongolia":              "MGL",
+  "India":                 "IND",
+  "Pakistan":              "PAK",
+  "Bangladesh":            "BAN",
+  "Sri Lanka":             "SRI",
+  "Nepal":                 "NEP",
+  "Bhutan":                "BHU",
+  "Palestine":             "PLE",
+  "Yemen":                 "YEM",
+  "Afghanistan":           "AFG",
 };
 
 function getTeamCode(name) {
@@ -1064,15 +1132,20 @@ function renderGroups(standings) {
       </thead>
       <tbody>`;
 
+    // Only show badges if games have been played in this group
+    const gamesPlayed = group.reduce((sum, t) => sum + t.all.played, 0);
+
     group.forEach((t, i) => {
       const teamName = t.team.name;
       const isFavRow = teamName === favTeam;
-      const isQual   = i < 2;   // top 2 qualify (simplified; WC2026 actually has 16 groups of 3)
-      const rowClass = isFavRow ? "fav-row" : (isQual ? "qualified" : "");
+      const isQual   = i < 2;
+      const rowClass = isFavRow ? "fav-row" : (isQual && gamesPlayed > 0 ? "qualified" : "");
 
-      const qualBadge = isQual
-        ? `<span class="qual-badge q">Q</span>`
-        : (i === 2 ? `<span class="qual-badge po">PO</span>` : "");
+      const qualBadge = gamesPlayed === 0 ? "" : (
+        isQual
+          ? `<span class="qual-badge q">Q</span>`
+          : (i === 2 ? `<span class="qual-badge po">PO</span>` : "")
+      );
 
       html += `<tr class="${rowClass}">
         <td>${TEAM_FLAGS[teamName] || ""} ${teamName}${qualBadge}</td>
